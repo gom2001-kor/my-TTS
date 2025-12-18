@@ -12,7 +12,7 @@ export function useTTS() {
     const utteranceRef = useRef(null);
     const textRef = useRef('');
 
-    // Load voices
+    // Load voices with smart initialization
     useEffect(() => {
         const loadVoices = () => {
             const allVoices = window.speechSynthesis.getVoices();
@@ -22,9 +22,34 @@ export function useTTS() {
             );
             setVoices(englishVoices);
 
-            // Set default voice
+            // Smart voice initialization (only if no voice selected yet)
             if (englishVoices.length > 0 && !selectedVoice) {
-                setSelectedVoice(englishVoices[0]);
+                let voiceToSelect = null;
+
+                // Priority 1: Check for saved user preference in localStorage
+                const savedVoiceName = localStorage.getItem('preferredVoice');
+                if (savedVoiceName) {
+                    voiceToSelect = englishVoices.find(v => v.name === savedVoiceName);
+                }
+
+                // Priority 2: If no saved preference, look for Google en-US voice (Android optimization)
+                if (!voiceToSelect) {
+                    voiceToSelect = englishVoices.find(
+                        v => v.name.includes('Google') && v.lang.startsWith('en-US')
+                    );
+                }
+
+                // Priority 3: Fallback to first en-US voice (e.g., for iOS)
+                if (!voiceToSelect) {
+                    voiceToSelect = englishVoices.find(v => v.lang.startsWith('en-US'));
+                }
+
+                // Final fallback: just use the first available English voice
+                if (!voiceToSelect) {
+                    voiceToSelect = englishVoices[0];
+                }
+
+                setSelectedVoice(voiceToSelect);
             }
         };
 
@@ -113,10 +138,18 @@ export function useTTS() {
         setRepeatMode(prev => !prev);
     }, []);
 
+    // Wrapper function to save voice preference when user selects a voice
+    const handleVoiceChange = useCallback((voice) => {
+        if (voice && voice.name) {
+            localStorage.setItem('preferredVoice', voice.name);
+        }
+        setSelectedVoice(voice);
+    }, []);
+
     return {
         voices,
         selectedVoice,
-        setSelectedVoice,
+        setSelectedVoice: handleVoiceChange,
         isPlaying,
         isPaused,
         rate,
