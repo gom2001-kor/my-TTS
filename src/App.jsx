@@ -4,6 +4,7 @@ import { useTTS } from './hooks/useTTS';
 import { useSpeechRecognition, calculateMatchPercentage } from './hooks/useSpeechRecognition';
 import { useAIChat } from './hooks/useAIChat';
 import { useSettings } from './hooks/useSettings';
+import { useOpenAITTS } from './hooks/useOpenAITTS';
 import { TextInput } from './components/TextInput';
 import { PlaybackControls } from './components/PlaybackControls';
 import { AudioControls } from './components/AudioControls';
@@ -16,6 +17,7 @@ import { Settings } from './components/Settings';
 
 const HISTORY_KEY = 'tts-history';
 const MAX_HISTORY = 10;
+const TTS_ENGINE_KEY = 'tts-engine';
 
 function App() {
   const [text, setText] = useState('');
@@ -24,26 +26,91 @@ function App() {
   const [mode, setMode] = useState('learning'); // 'learning' or 'chat'
   const [showSettings, setShowSettings] = useState(false);
   const [playingMessageId, setPlayingMessageId] = useState(null);
+  const [ttsEngine, setTtsEngine] = useState('browser'); // 'browser' or 'openai'
 
   const { settings, isLoaded, saveSettings } = useSettings();
 
+  // Load TTS engine preference
+  useEffect(() => {
+    const saved = localStorage.getItem(TTS_ENGINE_KEY);
+    if (saved) {
+      setTtsEngine(saved);
+    }
+  }, []);
+
+  // Save TTS engine preference
+  const handleSetTtsEngine = (engine) => {
+    setTtsEngine(engine);
+    localStorage.setItem(TTS_ENGINE_KEY, engine);
+  };
+
+  // Browser TTS
   const {
-    voices,
-    selectedVoice,
-    setSelectedVoice,
-    isPlaying,
-    isPaused,
+    voices: browserVoices,
+    selectedVoice: browserSelectedVoice,
+    setSelectedVoice: setBrowserSelectedVoice,
+    isPlaying: browserIsPlaying,
+    isPaused: browserIsPaused,
     rate,
     setRate,
     pitch,
     setPitch,
-    repeatMode,
-    toggleRepeatMode,
-    speak,
-    pause,
-    resume,
-    stop,
+    repeatMode: browserRepeatMode,
+    toggleRepeatMode: browserToggleRepeatMode,
+    speak: browserSpeak,
+    pause: browserPause,
+    resume: browserResume,
+    stop: browserStop,
   } = useTTS();
+
+  // OpenAI TTS
+  const {
+    voices: openaiVoices,
+    selectedVoice: openaiSelectedVoice,
+    setSelectedVoice: setOpenaiSelectedVoice,
+    isPlaying: openaiIsPlaying,
+    isPaused: openaiIsPaused,
+    error: openaiTTSError,
+    speak: openaiSpeak,
+    pause: openaiPause,
+    resume: openaiResume,
+    stop: openaiStop,
+  } = useOpenAITTS(settings.apiKey);
+
+  // Unified TTS state based on engine
+  const isPlaying = ttsEngine === 'openai' ? openaiIsPlaying : browserIsPlaying;
+  const isPaused = ttsEngine === 'openai' ? openaiIsPaused : browserIsPaused;
+  const repeatMode = browserRepeatMode; // Only browser supports repeat for now
+
+  // Unified TTS functions
+  const speak = (textToSpeak) => {
+    if (ttsEngine === 'openai') {
+      openaiSpeak(textToSpeak, repeatMode);
+    } else {
+      browserSpeak(textToSpeak);
+    }
+  };
+
+  const pause = () => {
+    if (ttsEngine === 'openai') {
+      openaiPause();
+    } else {
+      browserPause();
+    }
+  };
+
+  const resume = () => {
+    if (ttsEngine === 'openai') {
+      openaiResume();
+    } else {
+      browserResume();
+    }
+  };
+
+  const stop = () => {
+    openaiStop();
+    browserStop();
+  };
 
   const {
     isListening,
@@ -207,8 +274,8 @@ function App() {
             <button
               onClick={() => handleModeSwitch('learning')}
               className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${mode === 'learning'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-gray-600 hover:text-indigo-600'
+                ? 'bg-white text-indigo-600 shadow-sm'
+                : 'text-gray-600 hover:text-indigo-600'
                 }`}
             >
               <BookOpen className="w-4 h-4" />
@@ -217,8 +284,8 @@ function App() {
             <button
               onClick={() => handleModeSwitch('chat')}
               className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${mode === 'chat'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-gray-600 hover:text-indigo-600'
+                ? 'bg-white text-indigo-600 shadow-sm'
+                : 'text-gray-600 hover:text-indigo-600'
                 }`}
             >
               <MessageCircle className="w-4 h-4" />
@@ -240,6 +307,13 @@ function App() {
               {/* Playing Indicator */}
               <PlayingIndicator isPlaying={isPlaying} isPaused={isPaused} />
 
+              {/* OpenAI TTS Error */}
+              {ttsEngine === 'openai' && openaiTTSError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  {openaiTTSError}
+                </div>
+              )}
+
               {/* Playback Controls */}
               <PlaybackControls
                 isPlaying={isPlaying}
@@ -249,7 +323,7 @@ function App() {
                 onPause={pause}
                 onResume={resume}
                 onStop={stop}
-                onToggleRepeat={toggleRepeatMode}
+                onToggleRepeat={browserToggleRepeatMode}
                 disabled={!text.trim()}
               />
 
@@ -280,20 +354,29 @@ function App() {
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
               </div>
 
-              {/* Voice Selector */}
+              {/* Voice Selector with Engine Toggle */}
               <VoiceSelector
-                voices={voices}
-                selectedVoice={selectedVoice}
-                setSelectedVoice={setSelectedVoice}
+                voices={browserVoices}
+                selectedVoice={browserSelectedVoice}
+                setSelectedVoice={setBrowserSelectedVoice}
+                ttsEngine={ttsEngine}
+                setTtsEngine={handleSetTtsEngine}
+                openaiVoices={openaiVoices}
+                selectedOpenaiVoice={openaiSelectedVoice}
+                setSelectedOpenaiVoice={setOpenaiSelectedVoice}
+                hasApiKey={!!settings.apiKey}
+                onOpenSettings={() => setShowSettings(true)}
               />
 
-              {/* Audio Controls */}
-              <AudioControls
-                rate={rate}
-                setRate={setRate}
-                pitch={pitch}
-                setPitch={setPitch}
-              />
+              {/* Audio Controls - only show for browser TTS */}
+              {ttsEngine === 'browser' && (
+                <AudioControls
+                  rate={rate}
+                  setRate={setRate}
+                  pitch={pitch}
+                  setPitch={setPitch}
+                />
+              )}
             </div>
 
             {/* History Card */}
@@ -331,7 +414,7 @@ function App() {
         {/* Footer */}
         <footer className="text-center py-4">
           <p className="text-xs text-gray-400">
-            Web Speech API 기반 • Chrome, Edge 브라우저 권장
+            {ttsEngine === 'openai' ? 'OpenAI TTS API' : 'Web Speech API'} 기반 • Chrome, Edge 브라우저 권장
           </p>
         </footer>
       </main>
