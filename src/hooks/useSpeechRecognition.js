@@ -7,10 +7,9 @@ export function useSpeechRecognition(lang = 'en-US') {
     const [error, setError] = useState(null);
 
     const recognitionRef = useRef(null);
-    // Track which result indices we've already processed
-    const processedResultIndexRef = useRef(0);
-    // Store the current language setting
     const currentLangRef = useRef(lang);
+    // Store accumulated final results by their result index
+    const finalResultsRef = useRef(new Map());
 
     const startListening = useCallback((overrideLang) => {
         // Check for browser support
@@ -28,50 +27,47 @@ export function useSpeechRecognition(lang = 'en-US') {
         setError(null);
         setTranscript('');
         setInterimTranscript('');
-        processedResultIndexRef.current = 0;
+        finalResultsRef.current = new Map();
 
         try {
             const recognition = new SpeechRecognition();
             recognitionRef.current = recognition;
 
             recognition.lang = recognitionLang;
-            recognition.continuous = true;
+            // Use non-continuous mode for cleaner results
+            // Each utterance is processed as a single result
+            recognition.continuous = false;
             recognition.interimResults = true;
             recognition.maxAlternatives = 1;
 
             recognition.onstart = () => {
                 setIsListening(true);
                 setError(null);
-                processedResultIndexRef.current = 0;
+                finalResultsRef.current = new Map();
             };
 
             recognition.onresult = (event) => {
-                let newFinalText = '';
                 let currentInterim = '';
 
-                const startIndex = event.resultIndex;
-
-                for (let i = startIndex; i < event.results.length; i++) {
+                // Process all results
+                for (let i = 0; i < event.results.length; i++) {
                     const result = event.results[i];
-                    const transcriptText = result[0].transcript;
+                    const resultTranscript = result[0].transcript;
 
                     if (result.isFinal) {
-                        if (i >= processedResultIndexRef.current) {
-                            newFinalText += transcriptText + ' ';
-                            processedResultIndexRef.current = i + 1;
-                        }
+                        // Store final result by index (overwrites if same index)
+                        finalResultsRef.current.set(i, resultTranscript);
                     } else {
-                        currentInterim += transcriptText;
+                        // Collect interim (not-yet-final) results
+                        currentInterim = resultTranscript;
                     }
                 }
 
-                if (newFinalText.trim()) {
-                    setTranscript(prev => {
-                        const combined = prev ? prev + ' ' + newFinalText.trim() : newFinalText.trim();
-                        return combined.trim();
-                    });
-                }
+                // Build the complete transcript from all final results
+                const allFinals = Array.from(finalResultsRef.current.values());
+                const finalText = allFinals.join(' ').trim();
 
+                setTranscript(finalText);
                 setInterimTranscript(currentInterim);
             };
 
@@ -85,12 +81,14 @@ export function useSpeechRecognition(lang = 'en-US') {
                         break;
                     case 'no-speech':
                         setError('음성이 감지되지 않았습니다. 마이크에 가까이 대고 다시 시도해주세요.');
+                        // Don't set isListening to false, let user try again
                         break;
                     case 'network':
                         setError('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
                         setIsListening(false);
                         break;
                     case 'aborted':
+                        // User stopped, not an error
                         break;
                     default:
                         setError(`음성 인식 오류: ${event.error}`);
@@ -123,7 +121,7 @@ export function useSpeechRecognition(lang = 'en-US') {
         setTranscript('');
         setInterimTranscript('');
         setError(null);
-        processedResultIndexRef.current = 0;
+        finalResultsRef.current = new Map();
     }, []);
 
     // Update the default language
