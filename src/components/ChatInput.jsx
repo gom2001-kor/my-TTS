@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, MicOff, Send } from 'lucide-react';
 
 export function ChatInput({
@@ -10,37 +10,49 @@ export function ChatInput({
     onStartListening,
     onStopListening,
     voiceAutoSend,
+    onClearTranscript,
 }) {
     const [inputText, setInputText] = useState('');
     const inputRef = useRef(null);
-    const prevTranscriptRef = useRef('');
+    const hasSentRef = useRef(false);
+    const lastTranscriptRef = useRef('');
 
     // Sync transcript to input field when voice recognition is active
     useEffect(() => {
         if (isListening) {
-            const fullText = transcript + (interimTranscript ? ` ${interimTranscript}` : '');
-            setInputText(fullText.trim());
+            // Only use the final transcript, show interim as preview
+            const displayText = transcript + (interimTranscript ? ` ${interimTranscript}` : '');
+            setInputText(displayText.trim());
+            hasSentRef.current = false; // Reset sent flag when listening
         }
     }, [transcript, interimTranscript, isListening]);
 
     // Auto-send when voice recognition stops and voiceAutoSend is enabled
     useEffect(() => {
-        if (!isListening && prevTranscriptRef.current !== transcript && transcript.trim()) {
+        // Only trigger when isListening changes from true to false
+        if (!isListening && lastTranscriptRef.current !== transcript && transcript.trim() && !hasSentRef.current) {
             // Voice recognition just stopped with a final transcript
             if (voiceAutoSend) {
+                hasSentRef.current = true;
                 handleSend(transcript.trim());
             }
         }
-        prevTranscriptRef.current = transcript;
+        lastTranscriptRef.current = transcript;
     }, [isListening, transcript, voiceAutoSend]);
 
-    const handleSend = (textToSend = inputText) => {
-        const text = textToSend.trim();
+    const handleSend = useCallback((textToSend) => {
+        const text = (textToSend || inputText).trim();
         if (!text || disabled) return;
 
         onSend(text);
         setInputText('');
-    };
+        hasSentRef.current = true;
+
+        // Clear transcript after sending
+        if (onClearTranscript) {
+            onClearTranscript();
+        }
+    }, [inputText, disabled, onSend, onClearTranscript]);
 
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -54,6 +66,10 @@ export function ChatInput({
             onStopListening();
         } else {
             setInputText('');
+            hasSentRef.current = false;
+            if (onClearTranscript) {
+                onClearTranscript();
+            }
             onStartListening();
         }
     };
@@ -82,8 +98,8 @@ export function ChatInput({
                 <button
                     onClick={handleMicClick}
                     className={`flex-shrink-0 p-3 rounded-xl transition-all duration-200 ${isListening
-                            ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg shadow-rose-200 animate-pulse'
-                            : 'bg-gray-100 text-gray-600 hover:bg-rose-100 hover:text-rose-500'
+                        ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg shadow-rose-200 animate-pulse'
+                        : 'bg-gray-100 text-gray-600 hover:bg-rose-100 hover:text-rose-500'
                         }`}
                     title={isListening ? '녹음 중지' : '음성으로 입력'}
                 >

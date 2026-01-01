@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { X, Key, Volume2, Mic } from 'lucide-react';
+import { X, Key, Volume2, Mic, Bot } from 'lucide-react';
+
+const GPT_MODELS = [
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '빠르고 경제적 (기본값)' },
+    { id: 'gpt-4o', name: 'GPT-4o', description: '더 강력하고 정확함' },
+];
 
 export function Settings({
     isOpen,
@@ -10,6 +15,7 @@ export function Settings({
     const [apiKey, setApiKey] = useState(settings.apiKey || '');
     const [voiceAutoSend, setVoiceAutoSend] = useState(settings.voiceAutoSend ?? true);
     const [autoPlayResponse, setAutoPlayResponse] = useState(settings.autoPlayResponse ?? true);
+    const [gptModel, setGptModel] = useState(settings.gptModel || 'gpt-4o-mini');
     const [showApiKey, setShowApiKey] = useState(false);
 
     if (!isOpen) return null;
@@ -19,15 +25,16 @@ export function Settings({
             apiKey,
             voiceAutoSend,
             autoPlayResponse,
+            gptModel,
         });
         onClose();
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-fade-in max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 sticky top-0">
                     <h2 className="text-lg font-semibold text-gray-800">설정</h2>
                     <button
                         onClick={onClose}
@@ -64,6 +71,32 @@ export function Settings({
                         <p className="text-xs text-gray-400">
                             API 키는 브라우저에만 저장되며 서버로 전송되지 않습니다.
                         </p>
+                    </div>
+
+                    {/* GPT Model Selector */}
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <Bot className="w-4 h-4 text-indigo-500" />
+                            GPT 모델
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {GPT_MODELS.map((model) => (
+                                <button
+                                    key={model.id}
+                                    onClick={() => setGptModel(model.id)}
+                                    className={`p-3 rounded-xl text-left transition-all ${gptModel === model.id
+                                            ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-indigo-50'
+                                        }`}
+                                >
+                                    <p className="font-medium text-sm">{model.name}</p>
+                                    <p className={`text-xs mt-0.5 ${gptModel === model.id ? 'text-indigo-100' : 'text-gray-500'
+                                        }`}>
+                                        {model.description}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Voice Auto-Send Toggle */}
@@ -114,7 +147,7 @@ export function Settings({
                 </div>
 
                 {/* Footer */}
-                <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 sticky bottom-0">
                     <button
                         onClick={onClose}
                         className="flex-1 px-4 py-2.5 text-gray-600 font-medium bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"

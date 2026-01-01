@@ -18,6 +18,7 @@ export function AIChat({
     interimTranscript,
     onStartListening,
     onStopListening,
+    onClearTranscript,
     voiceAutoSend,
     // API key check
     hasApiKey,
@@ -137,6 +138,7 @@ export function AIChat({
                 interimTranscript={interimTranscript}
                 onStartListening={onStartListening}
                 onStopListening={onStopListening}
+                onClearTranscript={onClearTranscript}
                 voiceAutoSend={voiceAutoSend}
             />
         </div>

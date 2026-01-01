@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 
-export function useAIChat(apiKey) {
+export function useAIChat(apiKey, model = 'gpt-4o-mini') {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -72,7 +72,7 @@ ${getTimeContext()}
                     'Authorization': `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4o-mini',
+                    model: model,
                     messages: conversationHistory,
                     max_tokens: 500,
                     temperature: 0.7,
@@ -116,7 +116,7 @@ ${getTimeContext()}
             setIsLoading(false);
             return null;
         }
-    }, [apiKey, messages]);
+    }, [apiKey, messages, model]);
 
     const clearMessages = useCallback(() => {
         // Cancel any ongoing request

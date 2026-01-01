@@ -129,7 +129,7 @@ function App() {
     sendMessage,
     clearMessages,
     setError: setChatError,
-  } = useAIChat(settings.apiKey);
+  } = useAIChat(settings.apiKey, settings.gptModel || 'gpt-4o-mini');
 
   const speakingCallbackRef = useRef(null);
 
@@ -405,6 +405,7 @@ function App() {
             interimTranscript={interimTranscript}
             onStartListening={handleStartChatListening}
             onStopListening={stopListening}
+            onClearTranscript={clearTranscript}
             voiceAutoSend={settings.voiceAutoSend}
             hasApiKey={!!settings.apiKey}
             onOpenSettings={() => setShowSettings(true)}

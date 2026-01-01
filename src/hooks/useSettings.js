@@ -7,6 +7,7 @@ const defaultSettings = {
     apiKey: '',
     autoPlayResponse: true, // AI 응답 자동 재생
     chatLanguage: 'auto', // 'en', 'ko', 'auto'
+    gptModel: 'gpt-4o-mini', // 'gpt-4o-mini' or 'gpt-4o'
 };
 
 export function useSettings() {
@@ -51,6 +52,10 @@ export function useSettings() {
         saveSettings({ chatLanguage: value });
     }, [saveSettings]);
 
+    const setGptModel = useCallback((value) => {
+        saveSettings({ gptModel: value });
+    }, [saveSettings]);
+
     return {
         settings,
         isLoaded,
@@ -59,5 +64,6 @@ export function useSettings() {
         setApiKey,
         setAutoPlayResponse,
         setChatLanguage,
+        setGptModel,
     };
 }
