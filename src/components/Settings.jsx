@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Key, Volume2, Mic, Bot } from 'lucide-react';
 
 const GPT_MODELS = [
@@ -17,6 +17,14 @@ export function Settings({
     const [autoPlayResponse, setAutoPlayResponse] = useState(settings.autoPlayResponse ?? true);
     const [gptModel, setGptModel] = useState(settings.gptModel || 'gpt-4o-mini');
     const [showApiKey, setShowApiKey] = useState(false);
+
+    // Sync local state when settings prop changes (e.g., after loading from localStorage)
+    useEffect(() => {
+        setApiKey(settings.apiKey || '');
+        setVoiceAutoSend(settings.voiceAutoSend ?? true);
+        setAutoPlayResponse(settings.autoPlayResponse ?? true);
+        setGptModel(settings.gptModel || 'gpt-4o-mini');
+    }, [settings]);
 
     if (!isOpen) return null;
 
@@ -85,8 +93,8 @@ export function Settings({
                                     key={model.id}
                                     onClick={() => setGptModel(model.id)}
                                     className={`p-3 rounded-xl text-left transition-all ${gptModel === model.id
-                                            ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-indigo-50'
+                                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-indigo-50'
                                         }`}
                                 >
                                     <p className="font-medium text-sm">{model.name}</p>

@@ -1,11 +1,37 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+const CHAT_MESSAGES_KEY = 'tts-chat-messages';
 
 export function useAIChat(apiKey, model = 'gpt-4o-mini') {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isLoaded, setIsLoaded] = useState(false);
 
     const abortControllerRef = useRef(null);
+
+    // Load messages from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem(CHAT_MESSAGES_KEY);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    setMessages(parsed);
+                }
+            } catch (e) {
+                console.error('Failed to parse saved messages:', e);
+            }
+        }
+        setIsLoaded(true);
+    }, []);
+
+    // Save messages to localStorage whenever they change
+    useEffect(() => {
+        if (isLoaded && messages.length > 0) {
+            localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(messages));
+        }
+    }, [messages, isLoaded]);
 
     // Get current date/time context for AI
     const getTimeContext = () => {
@@ -124,6 +150,7 @@ ${getTimeContext()}
             abortControllerRef.current.abort();
         }
         setMessages([]);
+        localStorage.removeItem(CHAT_MESSAGES_KEY);
         setError(null);
         setIsLoading(false);
     }, []);
@@ -138,6 +165,7 @@ ${getTimeContext()}
     return {
         messages,
         isLoading,
+        isLoaded,
         error,
         sendMessage,
         clearMessages,
