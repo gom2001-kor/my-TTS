@@ -7,6 +7,8 @@ export function useSpeechRecognition() {
     const [error, setError] = useState(null);
 
     const recognitionRef = useRef(null);
+    // Track which result indices we've already processed
+    const processedResultIndexRef = useRef(0);
 
     const startListening = useCallback(() => {
         // Check for browser support
@@ -21,6 +23,7 @@ export function useSpeechRecognition() {
         setError(null);
         setTranscript('');
         setInterimTranscript('');
+        processedResultIndexRef.current = 0; // Reset processed index
 
         try {
             const recognition = new SpeechRecognition();
@@ -34,25 +37,44 @@ export function useSpeechRecognition() {
             recognition.onstart = () => {
                 setIsListening(true);
                 setError(null);
+                processedResultIndexRef.current = 0;
             };
 
             recognition.onresult = (event) => {
-                let interim = '';
-                let final = '';
+                let newFinalText = '';
+                let currentInterim = '';
 
-                for (let i = 0; i < event.results.length; i++) {
+                // IMPORTANT: Use event.resultIndex to only process NEW results
+                // event.results contains ALL results from the session start
+                // event.resultIndex tells us where the new results begin
+                const startIndex = event.resultIndex;
+
+                for (let i = startIndex; i < event.results.length; i++) {
                     const result = event.results[i];
+                    const transcriptText = result[0].transcript;
+
                     if (result.isFinal) {
-                        final += result[0].transcript + ' ';
+                        // Only add final results that haven't been processed
+                        if (i >= processedResultIndexRef.current) {
+                            newFinalText += transcriptText + ' ';
+                            processedResultIndexRef.current = i + 1;
+                        }
                     } else {
-                        interim += result[0].transcript;
+                        // Interim results - always show the latest
+                        currentInterim += transcriptText;
                     }
                 }
 
-                if (final) {
-                    setTranscript(prev => (prev + final).trim());
+                // Only update transcript if we have new final text
+                if (newFinalText.trim()) {
+                    setTranscript(prev => {
+                        const combined = prev ? prev + ' ' + newFinalText.trim() : newFinalText.trim();
+                        return combined.trim();
+                    });
                 }
-                setInterimTranscript(interim);
+
+                // Always update interim transcript
+                setInterimTranscript(currentInterim);
             };
 
             recognition.onerror = (event) => {
@@ -65,7 +87,6 @@ export function useSpeechRecognition() {
                         break;
                     case 'no-speech':
                         // Don't show error for no-speech, just let user try again
-                        // This happens when the recognition times out without hearing speech
                         setError('음성이 감지되지 않았습니다. 마이크에 가까이 대고 다시 시도해주세요.');
                         break;
                     case 'network':
@@ -106,6 +127,7 @@ export function useSpeechRecognition() {
         setTranscript('');
         setInterimTranscript('');
         setError(null);
+        processedResultIndexRef.current = 0;
     }, []);
 
     return {
@@ -142,7 +164,6 @@ export function calculateMatchPercentage(original, spoken) {
 
     // Count matching words (order-sensitive matching)
     let matchedCount = 0;
-    const maxLen = Math.max(originalWords.length, spokenWords.length);
 
     // Try to match each spoken word to original words
     const usedIndices = new Set();

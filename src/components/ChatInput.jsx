@@ -14,41 +14,60 @@ export function ChatInput({
 }) {
     const [inputText, setInputText] = useState('');
     const inputRef = useRef(null);
-    const hasSentRef = useRef(false);
-    const lastTranscriptRef = useRef('');
+
+    // Track if we already sent the current transcript to prevent duplicates
+    const sentTranscriptRef = useRef('');
+    // Track previous isListening state to detect when listening stops
+    const wasListeningRef = useRef(false);
 
     // Sync transcript to input field when voice recognition is active
     useEffect(() => {
         if (isListening) {
-            // Only use the final transcript, show interim as preview
+            // Combine final transcript with interim for display
             const displayText = transcript + (interimTranscript ? ` ${interimTranscript}` : '');
             setInputText(displayText.trim());
-            hasSentRef.current = false; // Reset sent flag when listening
         }
     }, [transcript, interimTranscript, isListening]);
 
     // Auto-send when voice recognition stops and voiceAutoSend is enabled
     useEffect(() => {
-        // Only trigger when isListening changes from true to false
-        if (!isListening && lastTranscriptRef.current !== transcript && transcript.trim() && !hasSentRef.current) {
-            // Voice recognition just stopped with a final transcript
-            if (voiceAutoSend) {
-                hasSentRef.current = true;
-                handleSend(transcript.trim());
+        // Detect transition from listening=true to listening=false
+        const justStoppedListening = wasListeningRef.current && !isListening;
+        wasListeningRef.current = isListening;
+
+        if (justStoppedListening && transcript.trim()) {
+            // Check if we haven't already sent this exact transcript
+            if (sentTranscriptRef.current !== transcript.trim()) {
+                if (voiceAutoSend) {
+                    sentTranscriptRef.current = transcript.trim();
+                    handleSendInternal(transcript.trim());
+                }
             }
         }
-        lastTranscriptRef.current = transcript;
     }, [isListening, transcript, voiceAutoSend]);
 
-    const handleSend = useCallback((textToSend) => {
-        const text = (textToSend || inputText).trim();
+    const handleSendInternal = useCallback((textToSend) => {
+        const text = textToSend.trim();
         if (!text || disabled) return;
 
         onSend(text);
         setInputText('');
-        hasSentRef.current = true;
+        sentTranscriptRef.current = text; // Mark as sent
 
         // Clear transcript after sending
+        if (onClearTranscript) {
+            onClearTranscript();
+        }
+    }, [disabled, onSend, onClearTranscript]);
+
+    const handleSend = useCallback(() => {
+        const text = inputText.trim();
+        if (!text || disabled) return;
+
+        onSend(text);
+        setInputText('');
+        sentTranscriptRef.current = text;
+
         if (onClearTranscript) {
             onClearTranscript();
         }
@@ -65,8 +84,9 @@ export function ChatInput({
         if (isListening) {
             onStopListening();
         } else {
+            // Reset state when starting new recording
             setInputText('');
-            hasSentRef.current = false;
+            sentTranscriptRef.current = '';
             if (onClearTranscript) {
                 onClearTranscript();
             }
@@ -127,7 +147,7 @@ export function ChatInput({
 
                 {/* Send Button */}
                 <button
-                    onClick={() => handleSend()}
+                    onClick={handleSend}
                     disabled={!inputText.trim() || disabled || isListening}
                     className="flex-shrink-0 p-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:from-indigo-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
                     title="전송"
