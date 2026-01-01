@@ -196,7 +196,8 @@ function App() {
     if (isPlaying) {
       stop();
     }
-    startListening();
+    // Use English for pronunciation practice
+    startListening('en-US');
   };
 
   // Chat mode handlers
@@ -221,12 +222,13 @@ function App() {
     }
   };
 
-  const handleStartChatListening = () => {
+  const handleStartChatListening = (lang = 'ko-KR') => {
     if (isPlaying) {
       stop();
     }
     clearTranscript();
-    startListening();
+    // Use the language selected by user in ChatInput
+    startListening(lang);
   };
 
   // Handle mode switch - clear state

@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic, MicOff, Send } from 'lucide-react';
+import { Mic, MicOff, Send, Globe } from 'lucide-react';
+
+const SPEECH_LANGUAGES = [
+    { code: 'ko-KR', label: '🇰🇷 한국어', short: '한' },
+    { code: 'en-US', label: '🇺🇸 English', short: 'EN' },
+];
 
 export function ChatInput({
     onSend,
@@ -13,6 +18,8 @@ export function ChatInput({
     onClearTranscript,
 }) {
     const [inputText, setInputText] = useState('');
+    const [speechLang, setSpeechLang] = useState('ko-KR'); // Default to Korean
+    const [showLangMenu, setShowLangMenu] = useState(false);
     const inputRef = useRef(null);
 
     // Track if we already sent the current transcript to prevent duplicates
@@ -90,9 +97,17 @@ export function ChatInput({
             if (onClearTranscript) {
                 onClearTranscript();
             }
-            onStartListening();
+            // Pass the selected language to the listening function
+            onStartListening(speechLang);
         }
     };
+
+    const handleLangSelect = (langCode) => {
+        setSpeechLang(langCode);
+        setShowLangMenu(false);
+    };
+
+    const currentLang = SPEECH_LANGUAGES.find(l => l.code === speechLang) || SPEECH_LANGUAGES[0];
 
     return (
         <div className="border-t border-gray-200 bg-white p-4">
@@ -108,12 +123,45 @@ export function ChatInput({
                             />
                         ))}
                     </div>
-                    <span className="text-sm text-rose-600 font-medium">듣는 중...</span>
+                    <span className="text-sm text-rose-600 font-medium">
+                        듣는 중... ({currentLang.label})
+                    </span>
                 </div>
             )}
 
             {/* Input Area */}
             <div className="flex items-end gap-2">
+                {/* Language Selector */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowLangMenu(!showLangMenu)}
+                        disabled={isListening}
+                        className={`flex-shrink-0 px-2.5 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${isListening
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-600'
+                            }`}
+                        title="음성 인식 언어 선택"
+                    >
+                        {currentLang.short}
+                    </button>
+
+                    {/* Language Dropdown */}
+                    {showLangMenu && !isListening && (
+                        <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-lg border border-gray-100 py-1 min-w-[140px] z-10">
+                            {SPEECH_LANGUAGES.map((lang) => (
+                                <button
+                                    key={lang.code}
+                                    onClick={() => handleLangSelect(lang.code)}
+                                    className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 transition-colors ${speechLang === lang.code ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-700'
+                                        }`}
+                                >
+                                    {lang.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 {/* Mic Button */}
                 <button
                     onClick={handleMicClick}

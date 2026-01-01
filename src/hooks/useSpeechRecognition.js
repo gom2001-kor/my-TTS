@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 
-export function useSpeechRecognition() {
+export function useSpeechRecognition(lang = 'en-US') {
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [interimTranscript, setInterimTranscript] = useState('');
@@ -9,8 +9,10 @@ export function useSpeechRecognition() {
     const recognitionRef = useRef(null);
     // Track which result indices we've already processed
     const processedResultIndexRef = useRef(0);
+    // Store the current language setting
+    const currentLangRef = useRef(lang);
 
-    const startListening = useCallback(() => {
+    const startListening = useCallback((overrideLang) => {
         // Check for browser support
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -19,19 +21,22 @@ export function useSpeechRecognition() {
             return;
         }
 
+        // Use override language if provided, otherwise use default
+        const recognitionLang = overrideLang || currentLangRef.current;
+
         // Clear previous state
         setError(null);
         setTranscript('');
         setInterimTranscript('');
-        processedResultIndexRef.current = 0; // Reset processed index
+        processedResultIndexRef.current = 0;
 
         try {
             const recognition = new SpeechRecognition();
             recognitionRef.current = recognition;
 
-            recognition.lang = 'en-US'; // Recognize English speech
-            recognition.continuous = true; // Keep listening until stopped
-            recognition.interimResults = true; // Show partial results
+            recognition.lang = recognitionLang;
+            recognition.continuous = true;
+            recognition.interimResults = true;
             recognition.maxAlternatives = 1;
 
             recognition.onstart = () => {
@@ -44,9 +49,6 @@ export function useSpeechRecognition() {
                 let newFinalText = '';
                 let currentInterim = '';
 
-                // IMPORTANT: Use event.resultIndex to only process NEW results
-                // event.results contains ALL results from the session start
-                // event.resultIndex tells us where the new results begin
                 const startIndex = event.resultIndex;
 
                 for (let i = startIndex; i < event.results.length; i++) {
@@ -54,18 +56,15 @@ export function useSpeechRecognition() {
                     const transcriptText = result[0].transcript;
 
                     if (result.isFinal) {
-                        // Only add final results that haven't been processed
                         if (i >= processedResultIndexRef.current) {
                             newFinalText += transcriptText + ' ';
                             processedResultIndexRef.current = i + 1;
                         }
                     } else {
-                        // Interim results - always show the latest
                         currentInterim += transcriptText;
                     }
                 }
 
-                // Only update transcript if we have new final text
                 if (newFinalText.trim()) {
                     setTranscript(prev => {
                         const combined = prev ? prev + ' ' + newFinalText.trim() : newFinalText.trim();
@@ -73,7 +72,6 @@ export function useSpeechRecognition() {
                     });
                 }
 
-                // Always update interim transcript
                 setInterimTranscript(currentInterim);
             };
 
@@ -86,7 +84,6 @@ export function useSpeechRecognition() {
                         setIsListening(false);
                         break;
                     case 'no-speech':
-                        // Don't show error for no-speech, just let user try again
                         setError('음성이 감지되지 않았습니다. 마이크에 가까이 대고 다시 시도해주세요.');
                         break;
                     case 'network':
@@ -94,7 +91,6 @@ export function useSpeechRecognition() {
                         setIsListening(false);
                         break;
                     case 'aborted':
-                        // User stopped, not an error
                         break;
                     default:
                         setError(`음성 인식 오류: ${event.error}`);
@@ -130,6 +126,11 @@ export function useSpeechRecognition() {
         processedResultIndexRef.current = 0;
     }, []);
 
+    // Update the default language
+    const setLanguage = useCallback((newLang) => {
+        currentLangRef.current = newLang;
+    }, []);
+
     return {
         isListening,
         transcript,
@@ -138,6 +139,7 @@ export function useSpeechRecognition() {
         startListening,
         stopListening,
         clearTranscript,
+        setLanguage,
     };
 }
 
@@ -145,12 +147,12 @@ export function useSpeechRecognition() {
 export function normalizeText(text) {
     return text
         .toLowerCase()
-        .replace(/[.,!?;:'"()\-–—]/g, '') // Remove punctuation
-        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/[.,!?;:'"()\-–—]/g, '')
+        .replace(/\s+/g, ' ')
         .trim();
 }
 
-// Calculate match percentage between two strings using Levenshtein distance
+// Calculate match percentage between two strings
 export function calculateMatchPercentage(original, spoken) {
     const normalizedOriginal = normalizeText(original);
     const normalizedSpoken = normalizeText(spoken);
@@ -162,10 +164,7 @@ export function calculateMatchPercentage(original, spoken) {
     const originalWords = normalizedOriginal.split(' ');
     const spokenWords = normalizedSpoken.split(' ');
 
-    // Count matching words (order-sensitive matching)
     let matchedCount = 0;
-
-    // Try to match each spoken word to original words
     const usedIndices = new Set();
 
     for (const spokenWord of spokenWords) {
@@ -178,7 +177,6 @@ export function calculateMatchPercentage(original, spoken) {
         }
     }
 
-    // Calculate percentage based on original text length
     const percentage = Math.round((matchedCount / originalWords.length) * 100);
-    return Math.min(percentage, 100); // Cap at 100%
+    return Math.min(percentage, 100);
 }
